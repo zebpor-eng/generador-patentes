@@ -68,7 +68,8 @@
 
 <script>
   const ANCHO = 1600, ALTO_BASE = 800;     // escala base (no cambiar: define el tamaño de letra impreso)
-  let ALTO = ALTO_BASE;                    // alto real de la imagen: margen superior/inferior reducido a la mitad
+  let ALTO = ALTO_BASE;                    // alto real de la imagen (se ajusta a las letras)
+  const MARGEN = 12;                       // margen blanco mínimo arriba y abajo, en píxeles
   const FUENTE = 'Oxygen Mono';
   const COLOR = '#333333';
   // Altura de las letras como fracción del alto de la imagen.
@@ -98,7 +99,12 @@
     const capH = ctx.measureText('H').actualBoundingBoxAscent || size * 0.7;
     const capObjetivo = ALTO_BASE * TAMANOS[tipo];
     size = size * capObjetivo / capH;
-    ALTO = Math.round(ALTO_BASE / 2 + capObjetivo / 2);
+
+    // Alto de la imagen = alto real de las letras + margen mínimo arriba y abajo
+    ctx.font = size + 'px "' + FUENTE + '"';
+    const m = ctx.measureText(limpio || 'H');
+    const asc = Math.ceil(m.actualBoundingBoxAscent), desc = Math.ceil(m.actualBoundingBoxDescent);
+    ALTO = asc + desc + 2 * MARGEN;
     cv.height = ALTO;
 
     ctx.fillStyle = '#FFFFFF';
@@ -109,11 +115,8 @@
       ctx.fillStyle = COLOR;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'alphabetic';
-      const m = ctx.measureText(limpio);
-      const alto = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
-      const y = (ALTO - alto) / 2 + m.actualBoundingBoxAscent;
       const x = ANCHO / 2 - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
-      ctx.fillText(limpio, x, y);
+      ctx.fillText(limpio, x, MARGEN + asc);
     }
     img.src = cv.toDataURL('image/png');
     btn.disabled = !limpio;
