@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#004AAC">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Generador de patentes · Autograb Curicó</title>
+<link href="https://fonts.googleapis.com/css2?family=Oxygen+Mono&family=Montserrat:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --navy:#003A88; --azul:#004AAC; --naranjo:#FF904D; --rojo:#F26B3A; --gris:#5b6b80; --bd:#dfe6ef; --fondo:#f3f6fa; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Montserrat', system-ui, sans-serif; color:var(--navy); background:var(--fondo); }
+  .franja { height:6px; background:linear-gradient(90deg, var(--naranjo), var(--rojo) 50%, var(--azul)); }
+  header { background:#fff; border-bottom:1px solid var(--bd); text-align:center; padding:18px 16px 14px; }
+  header img { height:110px; display:block; margin:0 auto; }
+  header p { margin:8px 0 0; font-size:12px; letter-spacing:4px; text-transform:uppercase; color:var(--gris); font-weight:600; }
+  main { max-width:720px; margin:0 auto; padding:22px 16px 40px; }
+  .card { background:#fff; border:1px solid var(--bd); border-radius:16px; padding:20px; box-shadow:0 6px 20px rgba(6,55,111,.06); }
+  label { display:block; font-size:12px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--gris); margin:0 0 8px; }
+  #patente { width:100%; font-family:'Oxygen Mono', monospace; font-size:30px; letter-spacing:8px; text-transform:uppercase; text-align:center;
+             color:var(--navy); padding:12px; border:2px solid var(--bd); border-radius:12px; outline:none; }
+  #patente:focus { border-color:var(--azul); }
+  .hint { font-size:12px; color:var(--gris); margin-top:6px; text-align:right; }
+  .tipo { display:flex; gap:10px; margin:18px 0; }
+  .tipo button { flex:1; padding:12px; border-radius:12px; border:2px solid var(--bd); background:#fff; color:var(--navy);
+                 font:600 15px 'Montserrat', sans-serif; letter-spacing:2px; text-transform:uppercase; cursor:pointer; }
+  .tipo button small { display:block; font-size:11px; font-weight:500; letter-spacing:0; text-transform:none; color:var(--gris); margin-top:2px; }
+  .tipo button.activo { border-color:var(--azul); background:var(--azul); color:#fff; }
+  .tipo button.activo small { color:#d6e4ff; }
+  #btn { width:100%; padding:14px; border:0; border-radius:12px; cursor:pointer; color:#fff; font:700 16px 'Montserrat', sans-serif; letter-spacing:2px;
+         text-transform:uppercase; background:linear-gradient(90deg, var(--naranjo), var(--rojo)); box-shadow:0 6px 16px rgba(242,84,91,.25); }
+  #compartir { width:100%; margin-top:10px; padding:12px; border:2px solid var(--azul); border-radius:12px; background:#fff; color:var(--azul); font:600 14px 'Montserrat', sans-serif; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; }
+  #btn:disabled { opacity:.5; cursor:default; box-shadow:none; }
+  #preview { width:100%; display:block; margin-top:18px; border:1px solid var(--bd); border-radius:12px; background:#fff; }
+  #msg { font-size:12px; color:var(--gris); margin-top:10px; min-height:16px; text-align:center; }
+  footer { text-align:center; font-size:11px; color:var(--gris); letter-spacing:2px; text-transform:uppercase; padding:0 0 24px; }
+</style>
+</head>
+<body>
+<div class="franja"></div>
+<header>
+  <img src="logo.png" alt="Autograb Curicó">
+  <p>Generador de patentes</p>
+</header>
+<main>
+  <div class="card">
+    <label for="patente">Patente</label>
+    <input id="patente" maxlength="6" value="WGCH11" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    <div class="hint" id="cuenta">6 / 6 caracteres</div>
+
+    <div class="tipo">
+      <button type="button" class="activo" data-tipo="auto">Auto<small>Letra de 7,5 mm</small></button>
+      <button type="button" data-tipo="moto">Moto<small>Letra de 5,5 mm</small></button>
+    </div>
+
+    <button id="btn" type="button">Descargar PNG</button>
+    <button id="compartir" type="button" hidden>Compartir / Imprimir</button>
+    <div id="msg"></div>
+    <img id="preview" alt="Vista previa de la patente">
+  </div>
+</main>
+<footer>Autograb · Curicó · funciona sin internet</footer>
+
+<canvas id="lienzo" width="1600" height="800" hidden></canvas>
+
+<script>
+  const ANCHO = 1600, ALTO = 800;          // tamaño final de la imagen (no cambiar: define la escala de impresión)
+  const FUENTE = 'Oxygen Mono';
+  const COLOR = '#333333';
+  // Altura de las letras como fracción del alto de la imagen.
+  // Base: 0.28 = 7 mm impresa. Auto = 7,5 mm. Moto = 5,5 mm.
+  const TAMANOS = { auto: 0.28 * 7.5 / 7, moto: 0.28 * 5.5 / 7 };
+  let tipo = 'auto';
+
+  const inp = document.getElementById('patente');
+  const cv  = document.getElementById('lienzo');
+  const ctx = cv.getContext('2d');
+  const img = document.getElementById('preview');
+  const msg = document.getElementById('msg');
+  const btn = document.getElementById('btn');
+  const cuenta = document.getElementById('cuenta');
+
+  const limpiar = v => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+
+  async function dibujar() {
+    const pos = inp.selectionStart;
+    const limpio = limpiar(inp.value);
+    if (inp.value !== limpio) { inp.value = limpio; try { inp.setSelectionRange(pos, pos); } catch(e){} }
+    cuenta.textContent = limpio.length + ' / 6 caracteres';
+
+    let size = 100;
+    try { await document.fonts.load(size + 'px "' + FUENTE + '"', limpio || 'A'); } catch(e){}
+    ctx.font = size + 'px "' + FUENTE + '"';
+    const capH = ctx.measureText('H').actualBoundingBoxAscent || size * 0.7;
+    size = size * (ALTO * TAMANOS[tipo]) / capH;
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, ANCHO, ALTO);
+
+    if (limpio) {
+      ctx.font = size + 'px "' + FUENTE + '"';
+      ctx.fillStyle = COLOR;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      const m = ctx.measureText(limpio);
+      const alto = m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+      const y = (ALTO - alto) / 2 + m.actualBoundingBoxAscent;
+      const x = ANCHO / 2 - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
+      ctx.fillText(limpio, x, y);
+    }
+    img.src = cv.toDataURL('image/png');
+    btn.disabled = !limpio;
+  }
+
+  document.querySelectorAll('.tipo button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.tipo button').forEach(x => x.classList.remove('activo'));
+    b.classList.add('activo');
+    tipo = b.dataset.tipo;
+    dibujar();
+  }));
+
+  function espejo() {
+    // Imagen en espejo (volteo horizontal) solo para la descarga
+    const esp = document.createElement('canvas');
+    esp.width = ANCHO; esp.height = ALTO;
+    const ec = esp.getContext('2d');
+    ec.translate(ANCHO, 0);
+    ec.scale(-1, 1);
+    ec.drawImage(cv, 0, 0);
+    return esp;
+  }
+  const nombre = () => inp.value + '_' + tipo + '.png';
+
+  btn.addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = espejo().toDataURL('image/png');
+    a.download = nombre();
+    document.body.appendChild(a); a.click(); a.remove();
+    msg.textContent = 'Descargada en espejo: ' + nombre();
+  });
+
+  const comp = document.getElementById('compartir');
+  if (navigator.canShare && navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] })) {
+    comp.hidden = false;
+    comp.addEventListener('click', () => {
+      espejo().toBlob(async b => {
+        try { await navigator.share({ files: [new File([b], nombre(), { type: 'image/png' })] }); }
+        catch (e) { if (e.name !== 'AbortError') msg.textContent = 'No se pudo compartir.'; }
+      }, 'image/png');
+    });
+  }
+
+  inp.addEventListener('input', dibujar);
+  dibujar();
+  document.fonts.ready.then(dibujar);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
