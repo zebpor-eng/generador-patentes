@@ -1,12 +1,12 @@
 // Service worker: guarda todo en el teléfono para que la app funcione sin internet.
-const CACHE = 'patentes-v2';
+const CACHE = 'patentes-v3';
 const ARCHIVOS = ['./', 'index.html', 'logo.png', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png'];
 const FUENTES = 'https://fonts.googleapis.com/css2?family=Oxygen+Mono&family=Montserrat:wght@500;600;700&display=swap';
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
-    await c.addAll(ARCHIVOS);
+    await c.addAll(ARCHIVOS.map(u => new Request(u, { cache: 'no-cache' })));
     // Descarga y guarda las tipografías (Oxygen Mono y Montserrat)
     try {
       const r = await fetch(FUENTES);
@@ -32,7 +32,7 @@ self.addEventListener('fetch', e => {
     const c = await caches.open(CACHE);
     // La página principal se busca primero en internet (para recibir actualizaciones) y si no hay conexión, se usa la guardada
     if (e.request.mode === 'navigate') {
-      try { const res = await fetch(e.request); if (res.ok) c.put('index.html', res.clone()); return res; }
+      try { const res = await fetch(e.request.url, { cache: 'no-cache' }); if (res.ok) c.put('index.html', res.clone()); return res; }
       catch (err) { return (await c.match('index.html')) || (await c.match('./')); }
     }
     const hit = await c.match(e.request);
