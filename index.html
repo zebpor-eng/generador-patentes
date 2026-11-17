@@ -67,7 +67,8 @@
 <canvas id="lienzo" width="1600" height="800" hidden></canvas>
 
 <script>
-  const ANCHO = 1600, ALTO = 800;          // tamaño final de la imagen (no cambiar: define la escala de impresión)
+  const ANCHO = 1600, ALTO_BASE = 800;     // escala base (no cambiar: define el tamaño de letra impreso)
+  let ALTO = ALTO_BASE;                    // alto real de la imagen: margen superior/inferior reducido a la mitad
   const FUENTE = 'Oxygen Mono';
   const COLOR = '#333333';
   // Altura de las letras como fracción del alto de la imagen.
@@ -95,7 +96,10 @@
     try { await document.fonts.load(size + 'px "' + FUENTE + '"', limpio || 'A'); } catch(e){}
     ctx.font = size + 'px "' + FUENTE + '"';
     const capH = ctx.measureText('H').actualBoundingBoxAscent || size * 0.7;
-    size = size * (ALTO * TAMANOS[tipo]) / capH;
+    const capObjetivo = ALTO_BASE * TAMANOS[tipo];
+    size = size * capObjetivo / capH;
+    ALTO = Math.round(ALTO_BASE / 2 + capObjetivo / 2);
+    cv.height = ALTO;
 
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, ANCHO, ALTO);
